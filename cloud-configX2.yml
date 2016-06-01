@@ -1,0 +1,49 @@
+#cloud-config
+users:
+  - name: "core"
+    passwd: "$6$rounds=4096$hkXsm1d1IURv3tHc$1ogZPCegt.D0LDNqFE9NqGRGI/GAiNbKLSsp1I2If5AaNMGrlic9VPR.nPbMANeFxZLNFdQ7vNDP04ldzG7sH0"
+    groups:
+      - "sudo"
+      - "docker"
+
+coreos:
+  update:
+    # best-effort	Default. If etcd is running, etcd-lock, otherwise simply reboot
+    # etcd-lock	Reboot after first taking a distributed lock in etcd
+    # reboot	Reboot immediately after an update is applied
+    # off	Do not reboot after updates are applied
+    reboot-strategy: best-effort
+  etcd2:
+    # generate a new token for each unique cluster from https://discovery.etcd.io/new?size=3
+    # specify the initial size of your cluster with ?size=X
+    # token below is for cluster size of 2
+    discovery: https://discovery.etcd.io/812d6f2bde0bffc59a85122277976228
+    
+    advertise-client-urls: http://$private_ipv4:2379,http://$private_ipv4:4001
+    initial-advertise-peer-urls: http://$private_ipv4:2380
+    
+    # listen on both the official ports and the legacy ports
+    # legacy ports can be omitted if your application doesn't depend on them
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    listen-peer-urls: http://$private_ipv4:2380
+  units:
+    - name: etcd2.service
+      command: start
+      
+    - name: fleet.service
+      command: start
+      
+    # custom service to start docker container on boot
+    - name: "hello.service"
+      command: "start"
+      content: |
+        [Unit]
+        Description=Docker Hello World
+        Requires=docker.service
+        After=docker.service
+        
+        [Service]
+        ExecStart=/usr/bin/docker run --rm hello-world
+        
+        [Install]
+        WantedBy=multi-user.target
